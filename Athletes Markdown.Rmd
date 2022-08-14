@@ -1,17 +1,32 @@
-install.packages("tidyverse")
-install.packages("scales")
+---
+title: "Top 100 paid Athletes 2014"
+author: "Liam Gesner"
+date: "2022-08-14"
+output: html_document
+---
+
+Loading in data
+```{r}
+install.packages("readr",repos = "http://cran.us.r-project.org")
+install.packages("tidyverse",repos = "http://cran.us.r-project.org")
+install.packages("scales", repos = "http://cran.us.r-project.org")
 library(tidyverse)
 library(scales)
 library(readr)
 Athletes <- read_csv("Most-paid-athletes/Athletes.csv")
-#Drop columns that can't be analyzed
+```
+
+Manipulating Athletes data set to drop unimportant columns 
+and add columns that can be analyzed.
+```{r}
 cols_to_drop <- c( "Wikipedia Page", "dbpedia Page", "Image", "Description")
 Athletes <- Athletes[, ! names(Athletes) %in% cols_to_drop, Drop = F]
-#Change currency to numeric so that computation is possible
 percent_Salary <- percent(parse_number(Athletes$`Salary/Winnings`)/parse_number(Athletes$`Total Pay`),accuracy = .1)
 percent_Endorsements <- percent(parse_number(Athletes$Endorsements)/parse_number(Athletes$`Total Pay`),accuracy = .1)
 Athletes <- cbind(Athletes, percent_Salary, percent_Endorsements)
-#Group by sport and nation
+```
+Using piping to group by qualitative data
+```{r}
 by_sport <- Athletes %>% 
   group_by(Sport) %>%
   mutate(percentSalaryMean = mean(parse_number((percent_Salary)))) %>%
@@ -20,7 +35,9 @@ by_nation <- Athletes %>%
   group_by(Nation) %>%
   mutate(percentSalaryMean = mean(parse_number((percent_Salary)))) %>%
   mutate(percentEndorsementMean = mean(parse_number(percent_Endorsements)))
-#Create a summary for each group
+```
+Creating summaries for grouped data for easier analysis
+```{r}
 summ_sport <- Athletes %>%
   group_by(Sport) %>%
   summarise(
@@ -54,27 +71,38 @@ summ_height <- Athletes %>%
     percentSalaryMean = mean(parse_number(percent_Salary), na.rm = TRUE),
     percentEndorsementMean = mean(parse_number(percent_Endorsements), na.rm = TRUE),
   )
-#plot interesting grouped data
+```
+
+Plotted the summary of ages and found that Endorsements were a 
+higher percentage of salary for athletes at the oldest ages and youngest ages. Which is likely because the oldest athletes have
+been around the longest and the youngest athletes can be promising
+for the future of the company they are sponsoring.
+```{r age, echo=FALSE}
 p_age <- ggplot(data = summ_age, aes(x=`Year of birth`, y=percentEndorsementMean))+
          geom_bar(stat = "identity",fill="black",color="lightblue") +
         labs(x= "Year of Birth", y = "Salary Percentage of Endorsements")+
         theme_classic()
-p_age
+plot(p_age)
+```
+
+Plotted the summary of heights and found that Athletes who are short
+either had a very high endorsement value or almost none at all. Athletes that are tall had a more consistent endorsement value between different heights.
+```{r height, echo=FALSE}
 p_height <- ggplot(data = summ_height, aes(x=`Height (cm)`, y=percentEndorsementMean))+
   geom_bar(stat = "identity",fill="black",color="red") +
   labs(x= "Height", y = "Salary Percentage of Endorsements")+
   theme_classic()
-p_height
+plot(p_height)
+```
+
+Plotted the summary of different sports and came to the conclusion that boxers had the highest salaries of the top 100 athletes. Found that, of the sports that had the most athletes on the list, (Baseball, Basketball, Football, and Soccer) soccer actually had the highest average salaries.
+```{r sport, echo =FALSE}
 p_sport <- ggplot(data = summ_sport, aes(x=Sport, y=salarymeanmillions))+
   geom_bar(stat = "identity",fill="white",color="lightgreen") +
   labs(x= "Sport", y = "Mean of Salary in Millions")+
   geom_text(aes(label = n))+
   theme_classic()
-p_sport
+plot(p_sport)
 
-
-
-    
-    
-  
+```
 
