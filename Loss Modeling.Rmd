@@ -1,12 +1,25 @@
-#install packages
-install.packages("tidyverse")
+---
+title: "Loss Modeling"
+author: "Liam Gesner"
+date: "2022-08-26"
+output: html_document
+---
+
+## Install Packages
+```{r}
 library(tidyverse)
 library(MASS)
-#get claim data set
+```
+
+## Retrieve Claim Data
+```{r}
 claim_data <- read.table('C:/Users/Liam/Documents/GitHub/Projects/claimdata.txt',
                         header = TRUE)
 claim_data <- as_tibble(claim_data)
-#rename columns
+```
+
+## Rename Columns
+```{r}
 claimdata <- claim_data %>%
   rename_all(function(.name) {
     .name %>% 
@@ -14,30 +27,45 @@ claimdata <- claim_data %>%
     str_replace(" ", "-")
   })
 claimdata <- rename(claimdata, expo = exp)
-#explore relation
+```
+
+## Explore Relation
+```{r}
 empirical <- claimdata$nclaims %>% 
   table %>% prop.table %>% as.numeric
 empirical
 k <- 1:(length(empirical) - 1)
 ab0_relation <- empirical[k+1] / empirical[k] * k  
 ab0_data <- tibble(k = k, ab0_rel = ab0_relation)
-#plot relation
+```
+
+## Plot Relation
+```{r, echo=FALSE}
 ggplot(data.frame(k = k, relation = ab0_relation), 
        aes(x = k, y = relation)) +
   theme_bw() + ylab('frac') +
   geom_point() +
   geom_smooth(method = 'lm', se = FALSE)
-#empirical mean and variance
+```
+
+## Find Empirical Mean and Variance
+```{r}
 m <- sum(claimdata$nclaims)/sum(claimdata$expo)
 var <- sum((claimdata$nclaims - m * claimdata$expo)^2)/
   sum(claimdata$expo)
-#fit neg binom distribution
+```
+
+## Fit Negative Binomial Distribution
+```{r}
 freq_glm_nb <- glm.nb(nclaims ~ 1 + offset(log(expo)), 
                       link = log,
                       data = claimdata)
 freq_glm_nb %>% broom::tidy()
 summary(freq_glm_nb)
-#log likelihood neg binom
+```
+
+## Logarithmic Likehihood Function for Negative Binomial
+```{r}
 neg_log_nb <- function(par, freq, expo){
   mu <- expo*exp(par[1])
   r <- exp(par[2])
@@ -45,21 +73,31 @@ neg_log_nb <- function(par, freq, expo){
 }
 nb <- nlm(neg_log_nb, c(1, 1), hessian = TRUE, 
               freq = claimdata$nclaims, expo = claimdata$expo)
-#fit poisson distribution
+```
+
+## Fit Poisson Distribution
+```{r}
 freq_glm_poi <- glm(nclaims ~ 1, offset = log(expo), 
                     family = poisson(link = "log"), 
                     data = claimdata)
 freq_glm_poi %>% broom::tidy()
 summary(freq_glm_poi)
-#log likelihood poisson
+```
+
+## Logarithmic Likelihood Function for Poisson
+```{r}
 neg_log_poi <- function(par, freq, expo){
   lambda <- expo*exp(par)
   -sum(dpois(freq, lambda, log = T))
 }
 poi <- nlm(neg_log_poi, 1, hessian = TRUE, 
                freq = claimdata$nclaims, expo = claimdata$expo)
-#use AIC to find best distribution
+```
+
+## Using AIC to find best distribution to fit data
+```{r}
 AIC_poi <- 2*length(poi$estimate) + 2*poi$minimum
 AIC_nb <- 2*length(nb$estimate) + 2*nb$minimum
 c(AIC_nb = AIC_nb, AIC_poi = AIC_poi)
-
+```
+## Negative Binomial is best distribution for this data
