@@ -1,0 +1,132 @@
+---
+title: "MLS Salaries"
+author: "Liam Gesner"
+date: "2022-08-16"
+output: html_document
+---
+Loading in data
+
+```{r}
+library(tidyverse)
+library(scales)
+library(readr)
+library(fs)
+library(dplyr)
+library(ggplot2)
+```
+
+Reading file paths
+```{r}
+file_paths <- fs::dir_ls("C:/Users/Liam/Documents/GitHub/Projects/Projects/MLS")
+file_paths
+```
+
+For loop to read in file contents as a list of data frames.
+```{r}
+file_contents <- list()
+
+for(i in seq_along(file_paths)){
+  file_contents[[i]] <- read.csv(
+    file = file_paths[[i]]
+  )
+}
+```
+
+Add year column to each file to distinguish between datasets.
+```{r}
+for(i in seq_along(file_contents)){
+  Year <- 2006
+  Year <- Year +i
+  file_contents[[i]]$Year <- Year
+}
+```
+
+Join the list of datasets into a single data set
+```{r}
+MLS_Salaries <- bind_rows(file_contents)
+```
+
+Grouping for analysis of MLS over recent years.
+```{r}
+Min_Max_Salary_By_Year <- MLS_Salaries %>%
+  group_by(`Year`) %>%
+  summarise(
+    minimum_Salary = paste0("$",formatC(min(`guaranteed_compensation`, na.rm = T), format = "f", digits = 2, big.mark = ",")),
+    maximum_Salary = paste0("$",formatC(max(`guaranteed_compensation`, na.rm = T), format = "f", digits = 2, big.mark = ","))
+  )
+head(Min_Max_Salary_By_Year)
+tail(Min_Max_Salary_By_Year)
+
+Clubs_by_Year <- MLS_Salaries %>%
+  group_by(`Year`) %>%
+  summarise(
+    number_of_clubs = length(unique(`club`))
+  )
+head(Clubs_by_Year)
+tail(Clubs_by_Year)
+
+Salary_By_Year <- MLS_Salaries %>%
+  group_by(`Year`) %>%
+  summarise(
+    mean_Salary = paste0("$",formatC(mean(`guaranteed_compensation`, na.rm = T), format = "f", digits = 2, big.mark = ",")),
+    total_Salary = paste0("$",formatC(sum(`guaranteed_compensation`, na.rm = T), format = "f", digits = 2, big.mark = ",")),
+    number_of_players = n()
+  )
+head(Salary_By_Year)
+tail(Salary_By_Year)
+
+C_Salary_By_Year <- MLS_Salaries %>%
+  group_by(`Year`, `club`) %>%
+  summarise(
+    number_of_players = n(),
+    median_Salary = paste0("$",formatC(median(`guaranteed_compensation`, na.rm = T), format = "f", digits = 2, big.mark = ","))
+  ) 
+C_Salary_By_Year <- C_Salary_By_Year %>% filter(number_of_players > 9)
+head(C_Salary_By_Year)
+tail(C_Salary_By_Year)
+
+P_Salary_By_Year <- MLS_Salaries %>%
+  group_by(`Year`, `position`) %>%
+  summarise(
+    number_of_players = n(),
+    median_Salary = paste0("$",formatC(median(`guaranteed_compensation`, na.rm = T), format = "f", digits = 2, big.mark = ",")),
+    mean_Salary = paste0("$",formatC(mean(`guaranteed_compensation`, na.rm = T), format = "f", digits = 2, big.mark = ","))
+  ) 
+P_Salary_By_Year <- P_Salary_By_Year %>% filter(number_of_players > 40)
+head(P_Salary_By_Year)
+tail(P_Salary_By_Year)
+```
+
+Plot club growth in MLS over the last 10 years from 2017 showing
+league's ability to expand at a greater rate than other 
+clubs folding.
+```{r club_growth, echo=FALSE}
+p_club_growth <- ggplot(data = Clubs_by_Year, aes(x=as.character(`Year`), y=`number_of_clubs`, group = 1))+
+  geom_bar(stat = "identity", color = "blue", fill = "white")+
+  labs(x= "Year", y = "Clubs in MLS")+
+  geom_text(aes(label = `number_of_clubs`)) +
+  theme_classic()
+plot(p_club_growth, type = "l")
+```
+
+Despite growth of the league, the league minimum salary has more than quadrupled from 2007 to 2017 showing sustainability. 
+
+```{r min_max, echo=FALSE}
+p_min_max <- ggplot(data = Min_Max_Salary_By_Year, aes(x=as.character(`Year`), y=`minimum_Salary`, group = 1))+
+  geom_bar(stat = "identity", fill = "black", color="lightgreen")+
+  labs(x= "Year", y = "Minimum Salary")+
+  theme_classic()
+plot(p_min_max, type = "l")
+```
+
+As MLS has expanded in size as well as benefits for players, the middle 50% of player's
+salaries has also at least doubled for each position. This is imperative in 
+competing for better players within our region, North and South America, to improve the quality 
+of the league and players.
+```{r position_salary, echo=FALSE}
+p_position_salary <- ggplot(data = P_Salary_By_Year, aes(x=as.character(`Year`), y=parse_number(`median_Salary`),color = `position`, group = `position`))+
+  geom_line(size = 2)+
+  labs(x= "Year", y = "Median Salary")+
+  theme_classic()
+plot(p_position_salary, type = "l")
+```
